@@ -15,7 +15,9 @@ local string_gmatch = string.gmatch
 local string_sub = string.sub
 local table_concat = table.concat
 
-local _M = {}
+local _M = {
+	max_tb_output_len = 70	-- controls the maximum length of the 'stringified' table before cutting with ' (more...)'
+}
 
 -- this tables should be weak so the elements in them won't become uncollectable
 local m_known_tables = { [_G] = "_G (global table)" }
@@ -40,6 +42,10 @@ add_known_module("bit32", "bit32 module")
 -- luajit
 add_known_module("bit", "bit module")
 add_known_module("jit", "jit module")
+-- lua5.3
+if _VERSION >= "Lua 5.3" then
+	add_known_module("utf8", "utf8 module")
+end
 
 
 local m_user_known_tables = {}
@@ -90,7 +96,10 @@ end
 
 local m_user_known_functions = {}
 
---local m_found_files = {}	-- aca armaria un cache de archivos encontrados, si vale la pena
+local function safe_tostring (value)
+	local ok, err = pcall(tostring, value)
+	if ok then return err else return ("<failed to get printable value>: '%s'"):format(err) end
+end
 
 -- Private:
 -- Parses a line, looking for possible function definitions (in a very naïve way) 
@@ -233,7 +242,7 @@ function Dumper:DumpLocals (level)
 		elseif type(value) == "string" then
 			self:add_f("%s%s = string: %q\r\n", prefix, name, value)
 		elseif type(value) == "userdata" then
-			self:add_f("%s%s = %s\r\n", prefix, name, tostring(value))
+			self:add_f("%s%s = %s\r\n", prefix, name, safe_tostring(value))
 		elseif type(value) == "nil" then
 			self:add_f("%s%s = nil\r\n", prefix, name)
 		elseif type(value) == "table" then
@@ -244,14 +253,14 @@ function Dumper:DumpLocals (level)
 			else
 				local txt = "{"
 				for k,v in pairs(value) do
-					txt = txt..tostring(k)..":"..tostring(v)
-					if #txt > 70 then
+					txt = txt..safe_tostring(k)..":"..safe_tostring(v)
+					if #txt > _M.max_tb_output_len then
 						txt = txt.." (more...)"
 						break
 					end
 					if next(value, k) then txt = txt..", " end
 				end
-				self:add_f("%s%s = %s  %s\r\n", prefix, name, tostring(value), txt.."}")
+				self:add_f("%s%s = %s  %s\r\n", prefix, name, safe_tostring(value), txt.."}")
 			end
 		elseif type(value) == "function" then
 			local info = self.getinfo(value, "nS")
@@ -311,9 +320,9 @@ function _M.stacktrace(thread, message, level)
 			else
 				dumper:add(",\r\n  ")
 			end
-			dumper:add(tostring(k))
+			dumper:add(safe_tostring(k))
 			dumper:add(": ")
-			dumper:add(tostring(v))
+			dumper:add(safe_tostring(v))
 		end
 		dumper:add("\r\n}")
 		original_error = dumper:concat_lines()
@@ -343,7 +352,7 @@ Stack Traceback
 		elseif info.what == "C" then
 			--print(info.namewhat, info.name)
 			--for k,v in pairs(info) do print(k,v, type(v)) end
-			local function_name = info.name or m_known_functions[info.func] or m_user_known_functions[value] or tostring(info.func)
+			local function_name = m_user_known_functions[info.func] or m_known_functions[info.func] or info.name or tostring(info.func)
 			dumper:add_f("(%d) %s C function '%s'\r\n", level_to_show, info.namewhat, function_name)
 			--dumper:add_f("%s%s = C %s\r\n", prefix, name, (m_known_functions[value] and ("function: " .. m_known_functions[value]) or tostring(value)))
 		elseif info.what == "tail" then
@@ -353,17 +362,15 @@ Stack Traceback
 			dumper:DumpLocals(level)
 		elseif info.what == "Lua" then
 			local source = info.short_src
-			local function_name
+			local function_name = m_user_known_functions[info.func] or m_known_functions[info.func] or info.name
 			if source:sub(2, 7) == "string" then
 				source = source:sub(9)
 			end
 			local was_guessed = false
-			if not info.name then
+			if not function_name or function_name == "?" then
 				--for k,v in pairs(info) do print(k,v, type(v)) end
 				function_name = GuessFunctionName(info)
 				was_guessed = true
-			else
-				function_name = info.name
 			end
 			-- test if we have a file name
 			local function_type = (info.namewhat == "") and "function" or info.namewhat

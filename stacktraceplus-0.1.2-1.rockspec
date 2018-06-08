@@ -1,16 +1,16 @@
 -- This file was automatically generated for the LuaDist project.
 
 package = "stacktraceplus"
-version = "0.1.1-1"
+version = "0.1.2-1"
 -- LuaDist source
 source = {
-  tag = "0.1.1-1",
+  tag = "0.1.2-1",
   url = "git://github.com/LuaDist-testing/stacktraceplus.git"
 }
 -- Original source
 -- source = {
--- 	url = "https://github.com/ignacio/StackTracePlus/archive/0.1.1-1.tar.gz",
--- 	dir = "StackTracePlus-0.1.1-1"
+-- 	url = "https://github.com/ignacio/StackTracePlus/archive/0.1.2-1.tar.gz",
+-- 	dir = "StackTracePlus-0.1.2-1"
 -- }
 description = {
 	summary = "StackTracePlus provides enhanced stack traces for Lua",
@@ -22,7 +22,7 @@ function names when they're not available, etc.
 	homepage = "http://github.com/ignacio/StackTracePlus"
 }
 
-dependencies = { "lua >= 5.1, < 5.3" }
+dependencies = { "lua >= 5.1, < 5.4" }
 
 build = {
 	type = "builtin",
